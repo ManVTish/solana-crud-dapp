@@ -10,6 +10,12 @@ import { useAnchorProvider } from '../solana/solana-provider'
 import { useTransactionToast } from '../use-transaction-toast'
 import { toast } from 'sonner'
 
+interface CreateEntryArgs{
+  title: string,
+  message: string,
+  owner: PublicKey,
+}
+
 export function useCounterProgram() {
   const { connection } = useConnection()
   const { cluster } = useCluster()
@@ -20,33 +26,36 @@ export function useCounterProgram() {
 
   const accounts = useQuery({
     queryKey: ['counter', 'all', { cluster }],
-    queryFn: () => program.account.counter.all(),
+    queryFn: () => program.account.journalEntryState.all(),
   })
 
   const getProgramAccount = useQuery({
     queryKey: ['get-program-account', { cluster }],
     queryFn: () => connection.getParsedAccountInfo(programId),
   })
+  
+  const createEntry = useMutation<string, Error, CreateEntryArgs>({
+    mutationKey: [`journalEntry`, `create`, { cluster }],
+    mutationFn: async ({title, message}) => {
+      return program.methods.createJournalEntry(title,message).rpc();
+    },
 
-  const initialize = useMutation({
-    mutationKey: ['counter', 'initialize', { cluster }],
-    mutationFn: (keypair: Keypair) =>
-      program.methods.initialize().accounts({ counter: keypair.publicKey }).signers([keypair]).rpc(),
-    onSuccess: async (signature) => {
-      transactionToast(signature)
-      await accounts.refetch()
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      accounts.refetch();
     },
-    onError: () => {
-      toast.error('Failed to initialize account')
+
+    onError: (error) => {
+      toast.error(`Error creating entry: ${error.message}`);
     },
-  })
+  });
 
   return {
     program,
-    programId,
     accounts,
     getProgramAccount,
-    initialize,
+    createEntry,
+    programId,
   }
 }
 
@@ -57,50 +66,40 @@ export function useCounterProgramAccount({ account }: { account: PublicKey }) {
 
   const accountQuery = useQuery({
     queryKey: ['counter', 'fetch', { cluster, account }],
-    queryFn: () => program.account.counter.fetch(account),
-  })
+    queryFn: () => program.account.journalEntryState.fetch(account),
+  });
 
-  const closeMutation = useMutation({
-    mutationKey: ['counter', 'close', { cluster, account }],
-    mutationFn: () => program.methods.close().accounts({ counter: account }).rpc(),
-    onSuccess: async (tx) => {
-      transactionToast(tx)
-      await accounts.refetch()
+    const updateEntry = useMutation<string, Error, CreateEntryArgs>({
+    mutationKey: [`journalEntry`, `update`, { cluster }],
+    mutationFn: async ({title, message}) => {
+      return program.methods.updateJournalEntry(title,message).rpc();
     },
-  })
 
-  const decrementMutation = useMutation({
-    mutationKey: ['counter', 'decrement', { cluster, account }],
-    mutationFn: () => program.methods.decrement().accounts({ counter: account }).rpc(),
-    onSuccess: async (tx) => {
-      transactionToast(tx)
-      await accountQuery.refetch()
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      accounts.refetch();
     },
-  })
 
-  const incrementMutation = useMutation({
-    mutationKey: ['counter', 'increment', { cluster, account }],
-    mutationFn: () => program.methods.increment().accounts({ counter: account }).rpc(),
-    onSuccess: async (tx) => {
-      transactionToast(tx)
-      await accountQuery.refetch()
+    onError: (error) => {
+      toast.error(`Error updating entry: ${error.message}`);
     },
-  })
+  });
 
-  const setMutation = useMutation({
-    mutationKey: ['counter', 'set', { cluster, account }],
-    mutationFn: (value: number) => program.methods.set(value).accounts({ counter: account }).rpc(),
-    onSuccess: async (tx) => {
-      transactionToast(tx)
-      await accountQuery.refetch()
+    const deleteEntry = useMutation({
+    mutationKey: [`journalEntry`, `delete`, { cluster }],
+    mutationFn: (title: string) => {
+      return program.methods.deleteJournalEntry(title).rpc();
     },
-  })
+
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      accounts.refetch();
+    },
+  });
 
   return {
     accountQuery,
-    closeMutation,
-    decrementMutation,
-    incrementMutation,
-    setMutation,
+    updateEntry,
+    deleteEntry,
   }
 }

@@ -1,0 +1,1 @@
+/home/manishroy/solana-foundation/solana-bootcamp/crud-app/anchor/target/sbpf-solana-solana/release/counter.so: /home/manishroy/solana-foundation/solana-bootcamp/crud-app/anchor/programs/counter/src/lib.rs
